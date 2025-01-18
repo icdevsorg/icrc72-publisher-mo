@@ -311,7 +311,7 @@ module {
       label proc for(item in events.vals()){
         debug if(debug_channel.announce){ D.print("          PUBLISHER: Processing Event: " # debug_show(item))};
 
-        //gurantee that the event has a broadcaster
+        //guarantee that the event has a broadcaster
         let ?broadcasters = BTree.get(state.broadcasters, Text.compare, item.namespace) else {
           debug if(debug_channel.announce) D.print("          PUBLISHER: Can't find broadcaster for Namespace: " # debug_show(BTree.toArray(state.broadcasters)));
           Vector.add(results, null);
@@ -349,7 +349,7 @@ module {
 
         Vector.add(results, ?thisId);
 
-        let emmitableEvent = {
+        let emitableEvent = {
           broadcaster = canister;
           id = thisId;
           prevId = prevId;
@@ -360,9 +360,9 @@ module {
           headers = item.headers;
         };
 
-        debug if(debug_channel.announce){ D.print("          PUBLISHER: Emitable Event: " # debug_show(emmitableEvent))};
+        debug if(debug_channel.announce){ D.print("          PUBLISHER: Emitable Event: " # debug_show(emitableEvent))};
 
-        Vector.add(state.pendingEvents, emmitableEvent : EmitableEvent);
+        Vector.add(state.pendingEvents, emitableEvent : EmitableEvent);
       };
       debug if(debug_channel.announce){ D.print("          PUBLISHER: Process Events Results: " # debug_show(results))};
       Vector.toArray(results);
