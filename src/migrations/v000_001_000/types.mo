@@ -76,8 +76,8 @@ module {
 
   public type EmitableEvent = {
     broadcaster: Principal;
-    id : Nat;
-    prevId : ?Nat;
+    eventId : Nat;
+    prevEventId : ?Nat;
     timestamp : Nat;
     namespace : Text;
     source : Principal;
@@ -88,8 +88,8 @@ module {
 
 
   public type Event = {
-    id : Nat;
-    prevId : ?Nat;
+    eventId : Nat;
+    prevEventId : ?Nat;
     timestamp : Nat;
     namespace : Text;
     source : Principal;
@@ -98,7 +98,7 @@ module {
   };
 
   public type EventNotification = {
-      id : Nat;
+      notificationId : Nat;
       eventId : Nat;
       prevEventId : ?Nat;
       timestamp : Nat;
@@ -181,12 +181,12 @@ module {
   };
 
   public type Environment = {
-    addRecord: ?(([(Text, Value)], ?[(Text,Value)]) -> Nat);
-    generateId: ?((Text, State) -> Nat);
+    var addRecord: ?(([(Text, Value)], ?[(Text,Value)]) -> Nat);
+    var generateId: ?((Text, State) -> Nat);
     icrc72Subscriber : ICRC72Subscriber.Subscriber;
-    icrc72OrchestratorCanister : Principal;
-    onEventPublishError : ?(<system>(NewEvent, BroadcasterService.PublishError) -> Bool);
-    onEventPublished : ?(<system>(NewEvent, ?BroadcasterService.PublishResult) -> ());
+    var icrc72OrchestratorCanister : Principal;
+    var onEventPublishError : ?(<system>(NewEvent, BroadcasterService.PublishError) -> Bool);
+    var onEventPublished : ?(<system>(NewEvent, ?BroadcasterService.PublishResult) -> ());
     tt: TT.TimerTool;
   };
 

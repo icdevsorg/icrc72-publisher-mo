@@ -135,7 +135,7 @@ module {
 
 
 
-  public class Publisher(stored: ?State, caller: Principal, canister: Principal, args: ?InitArgs, environment_passed: ?Environment, storageChanged: (State) -> ()){
+  public class Publisher(stored: ?State, class_caller: Principal, canister: Principal, initial_class_argsargs: ?InitArgs, environment_passed: ?Environment, storageChanged: (State) -> ()){
 
     public let debug_channel = {
       var publish = true;
@@ -143,7 +143,7 @@ module {
       var announce = true;
     };
 
-    public let environment = switch(environment_passed){
+    let environment = switch(environment_passed){
       case(?val) val;
       case(null) {
         D.trap("Environment is required");
@@ -160,6 +160,10 @@ module {
         foundState;
       };
     };
+
+    public func getState() : CurrentState {state};
+
+    public func getEnvironment() : Environment {environment};
 
     storageChanged(#v0_1_0(#data(state)));
 
@@ -302,7 +306,6 @@ module {
       results;
     };
 
-    public func getState(): CurrentState {state};
 
     private func processEvents(events: [NewEvent]): [?Nat]{
       debug if(debug_channel.announce){ D.print("          PUBLISHER: Processing Events: " # debug_show(events))};
@@ -327,7 +330,7 @@ module {
 
         //make sure we have a registered broadcaster before continuing
         let broadcasterSize = Set.size(broadcasters);
-        let ?canister = if(broadcasterSize == 0){
+        let ?foundBroadcaster = if(broadcasterSize == 0){
           debug if(debug_channel.announce) D.print("          PUBLISHER: No Broadcasters for Namespace: " # item.namespace);
           Vector.add(results, null);
           continue proc;
@@ -350,9 +353,9 @@ module {
         Vector.add(results, ?thisId);
 
         let emitableEvent = {
-          broadcaster = canister;
-          id = thisId;
-          prevId = prevId;
+          broadcaster = foundBroadcaster;
+          eventId = thisId;
+          prevEventId = prevId;
           timestamp = timestamp;
           namespace = item.namespace;
           source = publisher;
@@ -376,7 +379,10 @@ module {
       //todo: set the timer or call the coallation function
  
       if(state.drainEventId == null){
+        debug if(debug_channel.publish){ D.print("          PUBLISHER: Setting Drain Event " #debug_show(natNow()))};
         state.drainEventId := ?environment.tt.setActionASync<system>(natNow(), {actionType = CONST.publisher.actions.drain; params = to_candid(())}, FIVE_MINUTES);
+      } else {
+        debug if(debug_channel.publish){ D.print("          PUBLISHER: Drain Event Already Set")};
       };
         
       results;
@@ -479,18 +485,18 @@ module {
       
     };
 
-    private func handleBroadcasterEvents<system>(notification: EventNotification) : (){
+    private func handleBroadcasterEvents<system>(notification: EventNotification) :  async* (){
       debug if(debug_channel.publish){ D.print("          PUBLISHER: Handling Broadcaster Events" # debug_show(notification))};
 
-      if(notification.source != environment.icrc72OrchestratorCanister){
-        debug if(debug_channel.publish){ D.print("          PUBLISHER: handleBroadcasterEvents Not from Orchestrator")};
+      if(notification.source != environment.icrc72OrchestratorCanister and (await* environment.icrc72Subscriber.validateBroadcaster(notification.source)) == false){
+        debug if(debug_channel.publish){ D.print("          PUBLISHER: handleBroadcasterEvents Not from Orchestrator or broadcaster")};
         //todo: log something
-        return;
+        return ;
       };
 
       let #Map(data) = notification.data else {
         debug if(debug_channel.publish) D.print("               PUBLISHER: Invalid data " # debug_show(notification));
-        return;
+        return ;
       };
 
       label proc for(thisData in data.vals()){
@@ -503,10 +509,12 @@ module {
 
           for(thisBroadcasterArray in brodcasterBlobsArray.vals()){
             debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcaster: " # debug_show(thisBroadcasterArray))};
-            let #Array(thisBroadcaster) = thisBroadcasterArray else return;
-            let #Text(publicationNamespace) = thisBroadcaster[0] else return;
-            let #Blob(principalBlob) = thisBroadcaster[1] else return;
+            let #Array(thisBroadcaster) = thisBroadcasterArray else return ;
+            let #Text(publicationNamespace) = thisBroadcaster[0] else return ;
+            let #Blob(principalBlob) = thisBroadcaster[1] else return ;
             let principal = Principal.fromBlob(principalBlob);
+
+            debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcaster: " # debug_show(principal) # " Namespace: " # publicationNamespace)};
 
             fileBroadcaster(principal, publicationNamespace);
             
@@ -534,6 +542,8 @@ module {
       };
 
       debug if(debug_channel.publish){ D.print("          PUBLISHER: Handling Broadcaster Events Complete")};
+
+      return;
 
       
     };
@@ -669,7 +679,7 @@ module {
       environment.tt.registerExecutionListenerAsync(?CONST.publisher.actions.drain, handleDrainPublisher);
 
 
-      environment.icrc72Subscriber.registerExecutionListenerSync(?(CONST.publisher.sys # Principal.toText(canister)), handleBroadcasterEvents);
+      environment.icrc72Subscriber.registerExecutionListenerAsync(?(CONST.publisher.sys # Principal.toText(canister)), handleBroadcasterEvents);
 
       let subscriptionResult = await environment.icrc72Subscriber.registerSubscriptions([{
         namespace = CONST.publisher.sys # Principal.toText(canister);
