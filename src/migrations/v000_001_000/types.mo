@@ -187,6 +187,7 @@ module {
     var icrc72OrchestratorCanister : Principal;
     var onEventPublishError : ?(<system>(NewEvent, BroadcasterService.PublishError) -> Bool);
     var onEventPublished : ?(<system>(NewEvent, ?BroadcasterService.PublishResult) -> ());
+    var onPublisherReady : ?(<system>(State, Environment, Text) -> ());
     tt: TT.TimerTool;
   };
 

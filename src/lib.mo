@@ -505,7 +505,9 @@ module {
 
           debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcasters")};
 
-          let #Array(brodcasterBlobsArray) = thisData.1 else continue proc;  
+          let #Array(brodcasterBlobsArray) = thisData.1 else continue proc;
+
+          
 
           for(thisBroadcasterArray in brodcasterBlobsArray.vals()){
             debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcaster: " # debug_show(thisBroadcasterArray))};
@@ -516,7 +518,28 @@ module {
 
             debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcaster: " # debug_show(principal) # " Namespace: " # publicationNamespace)};
 
+            //todo: can be optimized
+            let currentSize = do?{state.broadcasters |>
+              BTree.get(_, Text.compare, publicationNamespace) |>
+              Set.size(_!)};
+
+            debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcaster: " # debug_show(currentSize))};
+             
+
             fileBroadcaster(principal, publicationNamespace);
+
+            if(currentSize == null or currentSize == ?0){
+              switch(environment.onPublisherReady){
+                case(?val){
+                  val<system>(state, environment, publicationNamespace);
+                };
+                case(null){};
+              };
+            } else {
+              debug if(debug_channel.publish){ D.print("          PUBLISHER: Already has broadcasters")};
+            };
+
+            
             
           };
         } else if(thisData.0 == CONST.broadcasters.publisher.broadcasters.remove){
@@ -668,13 +691,7 @@ module {
       debug if(debug_channel.startup){ D.print("          PUBLISHER: Initializing Publisher")};
       //can only be called once 
       
-      try{
-        await environment.icrc72Subscriber.initializeSubscriptions();
-      } catch(e){
-        _isInit := false;
-        state.error := ?("Error initializing subscriber" # Error.message(e));
-        return;
-      };
+      
       
       environment.tt.registerExecutionListenerAsync(?CONST.publisher.actions.drain, handleDrainPublisher);
 
@@ -686,6 +703,14 @@ module {
         config = [];
         memo = null
       }]);
+
+      try{
+        await environment.icrc72Subscriber.initializeSubscriptions();
+      } catch(e){
+        _isInit := false;
+        state.error := ?("Error initializing subscriber" # Error.message(e));
+        return;
+      };
 
       debug if(debug_channel.startup){ D.print("          PUBLISHER: Subscription Result: " # debug_show(subscriptionResult))};
     };
@@ -717,9 +742,6 @@ module {
             icrc72Subscriber = environment.icrc72Subscriber.stats();
         orchestrator = environment.icrc72OrchestratorCanister;
       };
-
-      
-
 
     };
   };
