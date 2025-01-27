@@ -143,6 +143,18 @@ module {
       var announce = true;
     };
 
+    public var vecLog = Vector.new<Text>();
+
+    private func d(doLog : Bool, message: Text) {
+      if(doLog){
+        Vector.add(vecLog, Nat.toText(Int.abs(Time.now())) # " " # message);
+        if(Vector.size(vecLog) > 5000){
+          vecLog := Vector.new<Text>();
+        };
+        D.print(message);
+      };
+    };
+
     let environment = switch(environment_passed){
       case(?val) val;
       case(null) {
@@ -245,7 +257,7 @@ module {
 
     //allows a program to handle events that were not published
     public func publishWithHandler<system>(events: [NewEvent], handler: (NewEvent) -> ()) : [?Nat] {
-      debug if(debug_channel.announce){ D.print("          PUBLISHER: Publishing Events with Handler: " # debug_show(events))};
+      debug d(debug_channel.announce, "          PUBLISHER: Publishing Events with Handler: " # debug_show(events));
       let results = publish<system>(events);
       var x = 0;
       for(item in results.vals()){
@@ -258,7 +270,7 @@ module {
     };
 
     public func publishAsync<system>(events: [NewEvent]): async [?Nat] {
-      debug if(debug_channel.announce){ D.print("          PUBLISHER: Publishing Events Async: " # debug_show(events))};
+      debug d(debug_channel.announce, "          PUBLISHER: Publishing Events Async: " # debug_show(events));
 
       let results = processEvents(events);
      
@@ -291,7 +303,7 @@ module {
             try{
               ignore await thisAccumulator;
             } catch(e){
-              debug if(debug_channel.publish){ D.print("          PUBLISHER: Error publishing event: " # debug_show(item.0) # Error.message(e))};
+              debug d(debug_channel.publish, "          PUBLISHER: Error publishing event: " # debug_show(item.0) # Error.message(e));
               //todo: do we refile them?
 
               //todo: we need to hand this to the client to see if they want to refile
@@ -308,15 +320,15 @@ module {
 
 
     private func processEvents(events: [NewEvent]): [?Nat]{
-      debug if(debug_channel.announce){ D.print("          PUBLISHER: Processing Events: " # debug_show(events))};
+      debug d(debug_channel.announce, "          PUBLISHER: Processing Events: " # debug_show(events));
       let results = Vector.new<?Nat>();
 
       label proc for(item in events.vals()){
-        debug if(debug_channel.announce){ D.print("          PUBLISHER: Processing Event: " # debug_show(item))};
+        debug d(debug_channel.announce, "          PUBLISHER: Processing Event: " # debug_show(item));
 
         //guarantee that the event has a broadcaster
         let ?broadcasters = BTree.get(state.broadcasters, Text.compare, item.namespace) else {
-          debug if(debug_channel.announce) D.print("          PUBLISHER: Can't find broadcaster for Namespace: " # debug_show(BTree.toArray(state.broadcasters)));
+          debug d(debug_channel.announce, "          PUBLISHER: Can't find broadcaster for Namespace: " # debug_show(BTree.toArray(state.broadcasters)));
           Vector.add(results, null);
           continue proc;
         };
@@ -331,7 +343,7 @@ module {
         //make sure we have a registered broadcaster before continuing
         let broadcasterSize = Set.size(broadcasters);
         let ?foundBroadcaster = if(broadcasterSize == 0){
-          debug if(debug_channel.announce) D.print("          PUBLISHER: No Broadcasters for Namespace: " # item.namespace);
+          debug d(debug_channel.announce, "          PUBLISHER: No Broadcasters for Namespace: " # item.namespace);
           Vector.add(results, null);
           continue proc;
         } else if(broadcasterSize == 1){
@@ -363,43 +375,43 @@ module {
           headers = item.headers;
         };
 
-        debug if(debug_channel.announce){ D.print("          PUBLISHER: Emitable Event: " # debug_show(emitableEvent))};
+        debug d(debug_channel.announce, "          PUBLISHER: Emitable Event: " # debug_show(emitableEvent));
 
         Vector.add(state.pendingEvents, emitableEvent : EmitableEvent);
       };
-      debug if(debug_channel.announce){ D.print("          PUBLISHER: Process Events Results: " # debug_show(results))};
+      debug d(debug_channel.announce, "          PUBLISHER: Process Events Results: " # debug_show(results));
       Vector.toArray(results);
     };
 
     //publish function that enques the event
     public func publish<system>(events: [NewEvent]): [?Nat] {
-      debug if(debug_channel.announce){ D.print("          PUBLISHER: Publishing Events: " # debug_show(events))};
+      debug d(debug_channel.announce, "          PUBLISHER: Publishing Events: " # debug_show(events));
       let results = processEvents(events);
 
       //todo: set the timer or call the coallation function
  
       if(state.drainEventId == null){
-        debug if(debug_channel.publish){ D.print("          PUBLISHER: Setting Drain Event " #debug_show(natNow()))};
+        debug d(debug_channel.publish, "          PUBLISHER: Setting Drain Event " #debug_show(natNow()));
         state.drainEventId := ?environment.tt.setActionASync<system>(natNow(), {actionType = CONST.publisher.actions.drain; params = to_candid(())}, FIVE_MINUTES);
       } else {
-        debug if(debug_channel.publish){ D.print("          PUBLISHER: Drain Event Already Set")};
+        debug d(debug_channel.publish, "          PUBLISHER: Drain Event Already Set");
       };
         
       results;
     };
 
     public func filePublication( publicationRecord : PublicationRecord): () {
-      debug if(debug_channel.publish){ D.print("          PUBLISHER: Filing Publication: " # debug_show(publicationRecord))};
+      debug d(debug_channel.publish, "          PUBLISHER: Filing Publication: " # debug_show(publicationRecord));
       ignore BTree.insert(state.publications, Nat.compare, publicationRecord.id, publicationRecord);
       ignore BTree.insert(state.publicationsByNamespace, Text.compare, publicationRecord.namespace, publicationRecord.id);
     };
 
     //add new publication
     public func registerPublications(publications: [PublicationRegistration]): async* [OrchestrationService.PublicationRegisterResult] {
-      debug if(debug_channel.publish){ D.print("          PUBLISHER: Registering Publications: " # debug_show(publications))};
+      debug d(debug_channel.publish, "          PUBLISHER: Registering Publications: " # debug_show(publications));
 
       /* if(environment.icrc72Subscriber.getState().readyForSubscription == false){
-        debug if(debug_channel.publish){ D.print("          PUBLISHER: Orchestrator not ready to register publications")};
+        debug d(debug_channel.publish, "          PUBLISHER: Orchestrator not ready to register publications");
         return [?#Err(#GenericBatchError("Orchestrator not ready to register publications"))];
       }; */
 
@@ -409,7 +421,7 @@ module {
         return [?#Err(#GenericBatchError("Network Error:" # Error.message(e)))];
       };
 
-      debug if(debug_channel.publish){ D.print("          PUBLISHER: Registering Publications Result: " # debug_show(result))};
+      debug d(debug_channel.publish, "          PUBLISHER: Registering Publications Result: " # debug_show(result));
 
       //what do we need to do with them?  anything?  Likely we should store them....or at least listen if we're ready to listen for them.
       var index = 0;
@@ -437,11 +449,11 @@ module {
 
     public func fileBroadcaster( broadcaster: Principal, namespace: Text): () {
 
-      debug if(debug_channel.publish){ D.print("          PUBLISHER: Filing Broadcaster: " # debug_show(broadcaster) # " Namespace: " # namespace # " canister: " # namespace)};
+      debug d(debug_channel.publish, "          PUBLISHER: Filing Broadcaster: " # debug_show(broadcaster) # " Namespace: " # namespace # " canister: " # namespace);
 
       let broadcasters = switch(BTree.get(state.broadcasters, Text.compare, namespace)){
         case(null) {
-          debug if(debug_channel.publish){ D.print("          PUBLISHER: Creating Broadcaster Collection" # namespace)};
+          debug d(debug_channel.publish, "          PUBLISHER: Creating Broadcaster Collection" # namespace);
           let col = Set.new<Principal>();
           ignore BTree.insert(state.broadcasters, Text.compare, namespace, col);
           col
@@ -451,20 +463,20 @@ module {
 
       if(Set.has(broadcasters, Set.phash, broadcaster)){
        
-          debug if(debug_channel.publish){ D.print("          PUBLISHER: Broadcaster Already Exists: " # debug_show(broadcaster) # " Namespace: " # namespace)};
+          debug d(debug_channel.publish, "          PUBLISHER: Broadcaster Already Exists: " # debug_show(broadcaster) # " Namespace: " # namespace);
       } else {
-          debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcaster: " # debug_show(broadcaster) # " Namespace: " # namespace)};
+          debug d(debug_channel.publish, "          PUBLISHER: Adding Broadcaster: " # debug_show(broadcaster) # " Namespace: " # namespace);
           Set.add(broadcasters, Set.phash, broadcaster);
       };
     };
 
     public func removeBroadcaster( broadcaster: Principal, namespace: Text): () {
 
-      debug if(debug_channel.publish){ D.print("          PUBLISHER: Removing Broadcaster: " # debug_show(broadcaster) # " Namespace: " # namespace # " canister: " # namespace)};
+      debug d(debug_channel.publish, "          PUBLISHER: Removing Broadcaster: " # debug_show(broadcaster) # " Namespace: " # namespace # " canister: " # namespace);
 
       let broadcasters = switch(BTree.get(state.broadcasters, Text.compare, namespace)){
         case(null) {
-          debug if(debug_channel.publish){ D.print("          PUBLISHER: Removing Broadcaster Collection but already null" # namespace)};
+          debug d(debug_channel.publish, "          PUBLISHER: Removing Broadcaster Collection but already null" # namespace);
           return;
         };
         case(?val) {val};
@@ -472,13 +484,13 @@ module {
 
       if(Set.has<Principal>(broadcasters, Set.phash, broadcaster)){
       
-          debug if(debug_channel.publish){ D.print("          PUBLISHER: Broadcaster removal: " # debug_show(broadcaster) # " Namespace: " # namespace)};
+          debug d(debug_channel.publish, "          PUBLISHER: Broadcaster removal: " # debug_show(broadcaster) # " Namespace: " # namespace);
           Set.delete(broadcasters, Set.phash, broadcaster);
           if(Set.size(broadcasters) == 0){
             ignore BTree.delete(state.broadcasters, Text.compare, namespace);
           };
       } else {
-        debug if(debug_channel.publish){ D.print("          PUBLISHER: already removed: " # debug_show(broadcaster) # " Namespace: " # namespace)};
+        debug d(debug_channel.publish, "          PUBLISHER: already removed: " # debug_show(broadcaster) # " Namespace: " # namespace);
         ignore BTree.delete(state.broadcasters, Text.compare, namespace);
         return;
       };
@@ -486,44 +498,44 @@ module {
     };
 
     private func handleBroadcasterEvents<system>(notification: EventNotification) :  async* (){
-      debug if(debug_channel.publish){ D.print("          PUBLISHER: Handling Broadcaster Events" # debug_show(notification))};
+      debug d(debug_channel.publish, "          PUBLISHER: Handling Broadcaster Events" # debug_show(notification));
 
       if(notification.source != environment.icrc72OrchestratorCanister and (await* environment.icrc72Subscriber.validateBroadcaster(notification.source)) == false){
-        debug if(debug_channel.publish){ D.print("          PUBLISHER: handleBroadcasterEvents Not from Orchestrator or broadcaster")};
+        debug d(debug_channel.publish, "          PUBLISHER: handleBroadcasterEvents Not from Orchestrator or broadcaster");
         //todo: log something
         return ;
       };
 
       let #Map(data) = notification.data else {
-        debug if(debug_channel.publish) D.print("               PUBLISHER: Invalid data " # debug_show(notification));
+        debug d(debug_channel.publish, "               PUBLISHER: Invalid data " # debug_show(notification));
         return ;
       };
 
       label proc for(thisData in data.vals()){
-        debug if(debug_channel.publish){ D.print("          PUBLISHER: Handling Broadcaster Event: " # debug_show((thisData.0, CONST.broadcasters.publisher.broadcasters.add)))};
+        debug d(debug_channel.publish, "          PUBLISHER: Handling Broadcaster Event: " # debug_show((thisData.0, CONST.broadcasters.publisher.broadcasters.add)));
         if(thisData.0 == CONST.broadcasters.publisher.broadcasters.add){
 
-          debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcasters")};
+          debug d(debug_channel.publish, "          PUBLISHER: Adding Broadcasters");
 
           let #Array(brodcasterBlobsArray) = thisData.1 else continue proc;
 
           
 
           for(thisBroadcasterArray in brodcasterBlobsArray.vals()){
-            debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcaster: " # debug_show(thisBroadcasterArray))};
+            debug d(debug_channel.publish, "          PUBLISHER: Adding Broadcaster: " # debug_show(thisBroadcasterArray));
             let #Array(thisBroadcaster) = thisBroadcasterArray else return ;
             let #Text(publicationNamespace) = thisBroadcaster[0] else return ;
             let #Blob(principalBlob) = thisBroadcaster[1] else return ;
             let principal = Principal.fromBlob(principalBlob);
 
-            debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcaster: " # debug_show(principal) # " Namespace: " # publicationNamespace)};
+            debug d(debug_channel.publish, "          PUBLISHER: Adding Broadcaster: " # debug_show(principal) # " Namespace: " # publicationNamespace);
 
             //todo: can be optimized
             let currentSize = do?{state.broadcasters |>
               BTree.get(_, Text.compare, publicationNamespace) |>
               Set.size(_!)};
 
-            debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcaster: " # debug_show(currentSize))};
+            debug d(debug_channel.publish, "          PUBLISHER: Adding Broadcaster: " # debug_show(currentSize));
              
 
             fileBroadcaster(principal, publicationNamespace);
@@ -536,7 +548,7 @@ module {
                 case(null){};
               };
             } else {
-              debug if(debug_channel.publish){ D.print("          PUBLISHER: Already has broadcasters")};
+              debug d(debug_channel.publish, "          PUBLISHER: Already has broadcasters");
             };
 
             
@@ -544,12 +556,12 @@ module {
           };
         } else if(thisData.0 == CONST.broadcasters.publisher.broadcasters.remove){
 
-          debug if(debug_channel.publish){ D.print("          PUBLISHER: Removing Broadcasters")};
+          debug d(debug_channel.publish, "          PUBLISHER: Removing Broadcasters");
 
           let #Array(brodcasterBlobsArray) = thisData.1 else continue proc;  
 
           for(thisBroadcasterArray in brodcasterBlobsArray.vals()){
-            debug if(debug_channel.publish){ D.print("          PUBLISHER: Adding Broadcaster: " # debug_show(thisBroadcasterArray))};
+            debug d(debug_channel.publish, "          PUBLISHER: Adding Broadcaster: " # debug_show(thisBroadcasterArray));
             let #Array(thisBroadcaster) = thisBroadcasterArray else return;
             let #Text(publicationNamespace) = thisBroadcaster[0] else return;
             let #Blob(principalBlob) = thisBroadcaster[1] else return;
@@ -559,12 +571,12 @@ module {
             
           };
         } else if(notification.namespace == CONST.publisher.broadcasters.error){
-          debug if(debug_channel.publish){ D.print("          PUBLISHER: Error Adding Broadcasters")};
+          debug d(debug_channel.publish, "          PUBLISHER: Error Adding Broadcasters");
           state.error := ?debug_show(notification);
         };
       };
 
-      debug if(debug_channel.publish){ D.print("          PUBLISHER: Handling Broadcaster Events Complete")};
+      debug d(debug_channel.publish, "          PUBLISHER: Handling Broadcaster Events Complete");
 
       return;
 
@@ -573,11 +585,11 @@ module {
 
     private func handleDrainPublisher<system>(id: TT.ActionId, action: TT.Action) : async* Star.Star<TT.ActionId, TT.Error> {
 
-      debug if(debug_channel.publish){ D.print("          PUBLISHER: Draining Publisher")};
+      debug d(debug_channel.publish, "          PUBLISHER: Draining Publisher");
 
       if(state.eventsProcessing == true){
         //delay to next round
-        debug if(debug_channel.publish){ D.print("          PUBLISHER: Already Running")};
+        debug d(debug_channel.publish, "          PUBLISHER: Already Running");
         ignore environment.tt.setActionASync<system>(natNow(), {actionType = CONST.publisher.actions.drain; params = to_candid(())}, FIVE_MINUTES);
         return #trappable(id);
       };
@@ -587,7 +599,7 @@ module {
 
       let groups = Map.new<Principal, Buffer.Buffer<EmitableEvent>>();
 
-      debug if(debug_channel.publish) D.print("          PUBLISHER: Processing Events: " # debug_show(Vector.size(state.pendingEvents)));
+      debug d(debug_channel.publish, "          PUBLISHER: Processing Events: " # debug_show(Vector.size(state.pendingEvents)));
 
       let procItems = Vector.toArray(state.pendingEvents);
       Vector.clear(state.pendingEvents);
@@ -608,7 +620,7 @@ module {
         //todo: check for size and split if needed
         let icrc72BroadcasterService : ICRC72BroadcasterService.Service = actor(Principal.toText(item.0));
         accumulator.add(item, icrc72BroadcasterService.icrc72_publish(Buffer.toArray(item.1)));
-        debug if(debug_channel.publish) D.print("          PUBLISHER: Publishing to: " # debug_show(item.0) # " Count: " # debug_show(item.1.size()));
+        debug d(debug_channel.publish, "          PUBLISHER: Publishing to: " # debug_show(item.0) # " Count: " # debug_show(item.1.size()));
       };
 
       if(accumulator.size() > 0){
@@ -619,7 +631,7 @@ module {
             for(thisItem in result.vals()){
               switch(thisItem){
                 case(?#Ok(val)) {
-                  debug if(debug_channel.publish){ D.print("          PUBLISHER: Published to: " # debug_show(thisAccumulator.0.0) # " Result: " # debug_show(thisItem))};
+                  debug d(debug_channel.publish, "          PUBLISHER: Published to: " # debug_show(thisAccumulator.0.0) # " Result: " # debug_show(thisItem));
                   //call interceptor
                   switch(environment.onEventPublished){
                     case(?val){
@@ -629,7 +641,7 @@ module {
                   };
                 };
                 case(?#Err(err)) {
-                  debug if(debug_channel.publish){ D.print("          PUBLISHER: Published to: " # debug_show(thisAccumulator.0.0) # " Result: " # debug_show(result))};
+                  debug d(debug_channel.publish, "          PUBLISHER: Published to: " # debug_show(thisAccumulator.0.0) # " Result: " # debug_show(result));
                   //todo: call interceptor
                   let requeue = switch(environment.onEventPublishError){
                     case(?val){
@@ -642,7 +654,7 @@ module {
                   if requeue  Vector.add(state.pendingEvents, thisAccumulator.0.1.get(idx));
                 };
                 case(null) {
-                  debug if(debug_channel.publish){ D.print("          PUBLISHER: Error publishing event null: " # debug_show(thisAccumulator.0.0))};
+                  debug d(debug_channel.publish, "          PUBLISHER: Error publishing event null: " # debug_show(thisAccumulator.0.0));
                   let requeue = switch(environment.onEventPublishError){
                     case(?val){
                       val<system>(thisAccumulator.0.1.get(idx), #GenericError({error_code=2834; message="Null Response"}));
@@ -657,7 +669,7 @@ module {
               idx := idx + 1;
             };
           } catch(e){
-            debug if(debug_channel.publish){ D.print("          PUBLISHER: Error publishing event: " # debug_show(thisAccumulator.0.0) # Error.message(e))};
+            debug d(debug_channel.publish, "          PUBLISHER: Error publishing event: " # debug_show(thisAccumulator.0.0) # Error.message(e));
             //todo: do we refile them?
             
 
@@ -688,7 +700,7 @@ module {
     public func initializeSubscriptions() : async() {
       if(_isInit == true) return;
       _isInit := true;
-      debug if(debug_channel.startup){ D.print("          PUBLISHER: Initializing Publisher")};
+      debug d(debug_channel.startup, "          PUBLISHER: Initializing Publisher");
       //can only be called once 
       
       
@@ -712,7 +724,7 @@ module {
         return;
       };
 
-      debug if(debug_channel.startup){ D.print("          PUBLISHER: Subscription Result: " # debug_show(subscriptionResult))};
+      debug d(debug_channel.startup, "          PUBLISHER: Subscription Result: " # debug_show(subscriptionResult));
     };
 
 
@@ -741,6 +753,7 @@ module {
         tt = environment.tt.getStats();
             icrc72Subscriber = environment.icrc72Subscriber.stats();
         orchestrator = environment.icrc72OrchestratorCanister;
+        log = Vector.toArray(vecLog);
       };
 
     };

@@ -209,6 +209,7 @@ module {
     icrc72OrchestratorCanister: Principal;
     icrc72Subscriber: ICRC72Subscriber.Stats;
     orchestrator: Principal;
+    log: [Text];
   };
 
   ///MARK: State
