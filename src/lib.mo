@@ -1,7 +1,7 @@
 import MigrationTypes "migrations/types";
 import MigrationLib "migrations";
 import BTree "mo:stableheapbtreemap/BTree";
-import OrchestrationService "../../icrc72-orchestrator.mo/src/service";
+import OrchestrationService "./orchestratorService";
 
 import Buffer "mo:base/Buffer";
 import D "mo:base/Debug";
@@ -14,9 +14,9 @@ import Star "mo:star/star";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Timer "mo:base/Timer";
-import TT "../../timerTool/src/";
-import ICRC72Subscriber "../../icrc72-subscriber.mo/src/";
-import ICRC72BroadcasterService "../../icrc72-broadcaster.mo/src/service";
+import TT "mo:timer-tool";
+import ICRC72Subscriber "mo:icrc72-subscriber-mo";
+import ICRC72BroadcasterService "./broadcasterService";
 import ClassPlusLib "mo:class-plus";
 
 module {

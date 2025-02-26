@@ -5,9 +5,9 @@ import VectorLib "mo:vector";
 import BTreeLib "mo:stableheapbtreemap/BTree";
 import SetLib "mo:map/Set";
 import MapLib "mo:map/Map";
-import TT "../../../../timerTool/src";
-import ICRC72Subscriber "../../../../icrc72-subscriber.mo/src";
-import BroadcasterService "../../../../icrc72-broadcaster.mo/src/service";
+import TT "mo:timer-tool";
+import ICRC72Subscriber "mo:icrc72-subscriber-mo";
+import BroadcasterService "../../broadcasterService";
 // please do not import any types from your project outside migrations folder here
 // it can lead to bugs when you change those types later, because migration types should not be changed
 // you should also avoid importing these types anywhere in your project directly from here
