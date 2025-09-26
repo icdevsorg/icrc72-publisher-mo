@@ -33,10 +33,13 @@ module {
       broadcasters = BTree.init<Text, Set.Set<Principal>>(null);
       previousEventIDs = BTree.init<Text, (Nat, Nat)>(null); //IDUsed, BroadcasterUsed
       pendingEvents = Vector.new<EmitableEvent>();
+      eventHistory = BTree.init<Nat, v0_1_0.Event>(null); // Initialize event history
 
       var drainEventId = null;
       var eventsProcessing = false;
       var error = null;
+      replays = BTree.init<Nat, (Text, ?Principal, ?Text, ?(Nat, Nat), (Nat, ?Nat))>(null); //namespace, broadcaster, filter, skip, range,
+      replayStatus = BTree.init<Nat, (Nat, Bool)>(null); //replayId -> (eventCount, completed)
       publications = BTree.init<Nat, PublicationRecord>(null);
       publicationsByNamespace = BTree.init<Text, Nat>(null);
       var readyForPublications = false;

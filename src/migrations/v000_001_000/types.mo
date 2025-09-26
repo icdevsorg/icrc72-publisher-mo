@@ -6,7 +6,7 @@ import BTreeLib "mo:stableheapbtreemap/BTree";
 import SetLib "mo:map/Set";
 import MapLib "mo:map/Map";
 import TT "mo:timer-tool";
-import ICRC72Subscriber "mo:icrc72-subscriber-mo";
+import ICRC72Subscriber "../../../../icrc72-subscriber.mo/src/";
 import BroadcasterService "../../broadcasterService";
 // please do not import any types from your project outside migrations folder here
 // it can lead to bugs when you change those types later, because migration types should not be changed
@@ -120,6 +120,10 @@ module {
         remove = "icrc72:publisher:broadcaster:remove";
         error = "icrc72:publisher:broadcaster:error";
       };
+      replay = {
+        add = "icrc77:publisher:replay:add";
+        remove = "icrc77:publisher:replay:remove";
+      };
     };
     broadcasters = {
       publisher={
@@ -188,6 +192,7 @@ module {
     var onEventPublishError : ?(<system>(NewEvent, BroadcasterService.PublishError) -> Bool);
     var onEventPublished : ?(<system>(NewEvent, ?BroadcasterService.PublishResult) -> ());
     var onPublisherReady : ?(<system>(State, Environment, Text) -> ());
+    var icrc77ReplayNotify : ?(<system>(State, Environment, Nat, Text, (Nat, ?Nat), Principal) -> ()); // replayId, namespace, range, broadcaster
     tt: TT.TimerTool;
   };
 
@@ -201,6 +206,9 @@ module {
     publications: [(Nat, PublicationRecord)];
     previousEventIds: [(Text, (Nat, Nat))];
     pendingEvents: [EmitableEvent];
+    replays: [(Nat, (Text, ?Principal, ?Text, ?(Nat, Nat), (Nat, ?Nat)))]; // ICRC77 replays
+    replayStatus: [(Nat, (Nat, Bool))]; // ICRC77 replay status tracking
+    eventHistory: [(Nat, Event)]; // Event history for replay functionality
     drainEventId: ?TT.ActionId;
     eventsProcessing: Bool;
     readyForPublications: Bool;
@@ -219,6 +227,11 @@ module {
     publicationsByNamespace : BTree.BTree<Text, Nat>; 
     previousEventIDs : BTree.BTree<Text, (Nat, Nat)>; //Namespace, Publication, IDUsed
     pendingEvents: Vector.Vector<EmitableEvent>;
+    replays : BTree.BTree<Nat, (Text, ?Principal, ?Text, ?(Nat, Nat), (Nat, ?Nat))>; //replayId -> (namespace, broadcaster, filter, skip, range)
+    replayStatus: BTree.BTree<Nat, (Nat, Bool)>; //replayId -> (lastEventIdPublished, isCompleted)
+    eventHistory : BTree.BTree<Nat, Event>; // eventId -> Event for replay functionality
+ 
+
     var drainEventId : ?TT.ActionId;
     var eventsProcessing : Bool;
     var readyForPublications: Bool;
