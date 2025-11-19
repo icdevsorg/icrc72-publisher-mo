@@ -11,7 +11,7 @@ module {
   public type EmitableEvent = v0_1_0.EmitableEvent;
   public type PublicationRecord = v0_1_0.PublicationRecord;
 
-  public func upgrade(prevmigration_state: MigrationTypes.State, args: MigrationTypes.Args, caller: Principal): MigrationTypes.State {
+  public func upgrade(_prevmigration_state: MigrationTypes.State, _args: MigrationTypes.Args, _caller: Principal): MigrationTypes.State {
 
     /*
     todo: implement init args

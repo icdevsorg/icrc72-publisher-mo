@@ -127,7 +127,7 @@ module {
 
       D.print("Publisher Init");
       switch(config.pullEnvironment){
-        case(?val) {
+        case(?_val) {
           D.print("pull environment has value");
          
         };
@@ -380,7 +380,7 @@ module {
         return [];
       };
 
-      let (namespace, broadcasterOpt, filter, skip, range) = replayInfo;
+      let (namespace, broadcasterOpt, filter, _skip, range) = replayInfo;
       let ?broadcaster = broadcasterOpt else {
         debug d(debug_channel.announce, "          PUBLISHER: No broadcaster assigned for replay " # debug_show(replayId));
         return [];
@@ -947,7 +947,7 @@ module {
       
     };
 
-    private func handleDrainPublisher<system>(id: TT.ActionId, action: TT.Action) : async* Star.Star<TT.ActionId, TT.Error> {
+    private func handleDrainPublisher<system>(id: TT.ActionId, _action: TT.Action) : async* Star.Star<TT.ActionId, TT.Error> {
 
       debug d(debug_channel.publish, "          PUBLISHER: Draining Publisher");
 
@@ -1042,7 +1042,7 @@ module {
             var idx = 0;
             for(thisItem in result.vals()){
               switch(thisItem){
-                case(?#Ok(val)) {
+                case(?#Ok(_val)) {
                   debug d(debug_channel.publish, "          PUBLISHER: Published to: " # debug_show(thisAccumulator.0.0) # " Result: " # debug_show(thisItem));
                   //call interceptor
                   switch(environment.onEventPublished){
