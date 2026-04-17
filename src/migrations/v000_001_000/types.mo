@@ -1,10 +1,14 @@
-import Time "mo:base/Time";
-import Principal "mo:base/Principal";
+import Time "mo:core/Time";
+import Nat "mo:core/Nat";
+import Principal "mo:core/Principal";
+import Text "mo:core/Text";
 import Star "mo:star/star";
-import VectorLib "mo:vector";
+import ListLib "mo:core/List";
 import BTreeLib "mo:stableheapbtreemap/BTree";
-import SetLib "mo:map/Set";
-import MapLib "mo:map/Map";
+import SetLib "mo:core/Set";
+import Iter "mo:core/Iter";
+import Order "mo:core/Order";
+import CM "../../../../../../ICDevs/projects/icrc-fungible-group/champ_map/src/lib";
 import TT "mo:timer-tool";
 import ICRC72Subscriber "../../../../icrc72-subscriber.mo/src/";
 import BroadcasterService "../../broadcasterService";
@@ -17,9 +21,83 @@ import BroadcasterService "../../broadcasterService";
 module {
 
   public let BTree = BTreeLib;
-  public let Set = SetLib;
-  public let Map = MapLib;
-  public let Vector = VectorLib;
+  public module Set {
+    public type Set<T> = SetLib.Set<T>;
+    public let phash = Principal.compare;
+    public let thash = Text.compare;
+    public let nhash = Nat.compare;
+
+    public func new<T>() : Set<T> = SetLib.empty<T>();
+    public func size<T>(self : Set<T>) : Nat = SetLib.size(self);
+    public func has<T>(self : Set<T>, compare : (T, T) -> Order.Order, value : T) : Bool = SetLib.contains(self, compare, value);
+    public func add<T>(self : Set<T>, compare : (T, T) -> Order.Order, value : T) : () = SetLib.add(self, compare, value);
+    public func remove<T>(self : Set<T>, compare : (T, T) -> Order.Order, value : T) : () = SetLib.remove(self, compare, value);
+    public func delete<T>(self : Set<T>, compare : (T, T) -> Order.Order, value : T) : Bool {
+      if (SetLib.contains(self, compare, value)) {
+        SetLib.remove(self, compare, value);
+        true;
+      } else {
+        false;
+      };
+    };
+    public func toArray<T>(self : Set<T>) : [T] = SetLib.toArray(self);
+    public func fromIter<T>(iter : Iter.Iter<T>, compare : (T, T) -> Order.Order) : Set<T> = SetLib.fromIter(iter, compare);
+    public func keys<T>(self : Set<T>) : Iter.Iter<T> = SetLib.values(self);
+  };
+
+  public module Map {
+    public type HashUtils<K> = CM.HashUtils<K>;
+    public type Map<K, V> = { var inner : CM.Map<K, V> };
+    public let ihash = CM.ihash;
+    public let nhash = CM.nhash;
+    public let thash = CM.thash;
+    public let phash = CM.phash;
+    public let bhash = CM.bhash;
+
+    public func new<K, V>() : Map<K, V> = { var inner = CM.empty<K, V>() };
+    public func get<K, V>(self : Map<K, V>, hashUtils : HashUtils<K>, key : K) : ?V = CM.get(self.inner, hashUtils, key);
+    public func put<K, V>(self : Map<K, V>, hashUtils : HashUtils<K>, key : K, value : V) : () {
+      self.inner := CM.put(self.inner, hashUtils, key, value);
+    };
+    public func remove<K, V>(self : Map<K, V>, hashUtils : HashUtils<K>, key : K) : () {
+      self.inner := CM.remove(self.inner, hashUtils, key);
+    };
+    public func entries<K, V>(self : Map<K, V>) : Iter.Iter<(K, V)> = CM.entries(self.inner);
+    public func toArray<K, V>(self : Map<K, V>) : [(K, V)] = CM.toArray(self.inner);
+    public func size<K, V>(self : Map<K, V>) : Nat = CM.size(self.inner);
+    public func fromIter<K, V>(iter : Iter.Iter<(K, V)>, hashUtils : HashUtils<K>) : Map<K, V> = {
+      var inner = CM.fromIter(iter, hashUtils)
+    };
+  };
+
+  public module Vector {
+    public type Vector<T> = ListLib.List<T>;
+
+    public func new<T>() : Vector<T> = ListLib.empty<T>();
+    public func init<T>(size : Nat, initValue : T) : Vector<T> = ListLib.repeat(initValue, size);
+    public func size<T>(self : Vector<T>) : Nat = ListLib.size(self);
+    public func add<T>(self : Vector<T>, value : T) : () = ListLib.add(self, value);
+    public func addFromIter<T>(self : Vector<T>, iter : Iter.Iter<T>) : () = ListLib.addAll(self, iter);
+    public func clear<T>(self : Vector<T>) : () = ListLib.clear(self);
+    public func vals<T>(self : Vector<T>) : Iter.Iter<T> = ListLib.values(self);
+    public func toArray<T>(self : Vector<T>) : [T] = ListLib.toArray(self);
+    public func getOpt<T>(self : Vector<T>, index : Nat) : ?T {
+      if (index < ListLib.size(self)) {
+        ?ListLib.at(self, index)
+      } else {
+        null
+      }
+    };
+    public func put<T>(self : Vector<T>, index : Nat, value : T) : () = ListLib.put(self, index, value);
+    public func indexOf<T>(element : T, self : Vector<T>, equal : (T, T) -> Bool) : ?Nat = ListLib.indexOf(self, equal, element);
+    public func iterateItems<T>(self : Vector<T>, f : (Nat, T) -> ()) : () {
+      var index : Nat = 0;
+      for (item in ListLib.values(self)) {
+        f(index, item);
+        index += 1;
+      };
+    };
+  };
 
   public type Namespace = Text;
 

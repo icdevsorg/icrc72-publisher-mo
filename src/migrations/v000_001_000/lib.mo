@@ -8,6 +8,7 @@ module {
   public let BTree = v0_1_0.BTree;
   public let Vector = v0_1_0.Vector;
   public let Set = v0_1_0.Set;
+  public let Map = v0_1_0.Map;
   public type EmitableEvent = v0_1_0.EmitableEvent;
   public type PublicationRecord = v0_1_0.PublicationRecord;
 

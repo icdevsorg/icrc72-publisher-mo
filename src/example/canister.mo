@@ -1,6 +1,6 @@
 
 import Publisher "../";
-shared (deployer) actor class Example<system>()  = this {
+persistent actor class Example<system>()  = this {
 
   type PublisherClass = Publisher.Publisher;
 

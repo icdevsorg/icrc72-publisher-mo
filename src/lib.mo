@@ -116,8 +116,8 @@ module {
     ClassPlusLib.ClassPlusGetter<Publisher, State, InitArgs, Environment>(item);
   };
 
-  public func Init<system>(config : {
-      manager: ClassPlusLib.ClassPlusInitializationManager;
+  public func Init(config : {
+      org_icdevs_class_plus_manager: ClassPlusLib.ClassPlusInitializationManager;
       initialState: State;
       args : ?InitArgs;
       pullEnvironment : ?(() -> Environment);
@@ -135,7 +135,7 @@ module {
           D.print("pull environment is null");
         };
       };  
-      ClassPlusLib.ClassPlus<system,
+      ClassPlusLib.ClassPlus<
         Publisher, 
         State,
         InitArgs,
@@ -144,7 +144,7 @@ module {
 
 
 
-  public class Publisher(stored: ?State, class_caller: Principal, canister: Principal, initial_class_argsargs: ?InitArgs, environment_passed: ?Environment, storageChanged: (State) -> ()){
+  public class Publisher(stored: ?State, _class_caller: Principal, canister: Principal, _initial_class_argsargs: ?InitArgs, environment_passed: ?Environment, storageChanged: (State) -> ()){
 
     public let debug_channel = {
       var publish = true;
@@ -171,14 +171,26 @@ module {
       };
     };
 
-    var state : CurrentState = switch(stored){
+    let state : CurrentState = switch(stored){
       case(null) {
-        let #v0_1_0(#data(foundState)) = init(initialState(),currentStateVersion, null, canister);
-        foundState;
+        switch (init(initialState(), currentStateVersion, null, canister)) {
+          case (#v0_1_0(#data(foundState))) {
+            foundState;
+          };
+          case (_) {
+            D.trap("unexpected publisher migration state during initialization");
+          };
+        };
       };
       case(?val) {
-        let #v0_1_0(#data(foundState)) = init(val, currentStateVersion, null, canister);
-        foundState;
+        switch (init(val, currentStateVersion, null, canister)) {
+          case (#v0_1_0(#data(foundState))) {
+            foundState;
+          };
+          case (_) {
+            D.trap("unexpected publisher migration state during restore");
+          };
+        };
       };
     };
 
@@ -308,7 +320,7 @@ module {
         if(idx < 100){
           Vector.put(procItems,idx, item);
         } else {
-          Vector.put(newItems, idx-100, item);
+          Vector.put(newItems, Nat.sub(idx, 100), item);
         };
       });
 
@@ -330,7 +342,7 @@ module {
           case(?val) val;
           case(null) {
             let newGroup = Buffer.Buffer<EmitableEvent>(1);
-            ignore Map.put(groups, Map.phash, item.broadcaster, newGroup);
+            Map.put(groups, Map.phash, item.broadcaster, newGroup);
             newGroup;
           };
         };
@@ -380,7 +392,7 @@ module {
         return [];
       };
 
-      let (namespace, broadcasterOpt, filter, _skip, range) = replayInfo;
+      let (namespace, broadcasterOpt, _filter, _skip, _range) = replayInfo;
       let ?broadcaster = broadcasterOpt else {
         debug d(debug_channel.announce, "          PUBLISHER: No broadcaster assigned for replay " # debug_show(replayId));
         return [];
@@ -438,15 +450,12 @@ module {
         emitableEvents.add(emitableEvent);
       };
 
-      // Update replay status
-      ignore BTree.insert(state.replayStatus, Nat.compare, replayId, (lastEventId, isComplete));
-
       // Publish to broadcaster
       let icrc72BroadcasterService : ICRC72BroadcasterService.Service = actor(Principal.toText(broadcaster));
       
       debug d(debug_channel.announce, "          PUBLISHER: About to publish replay batch to broadcaster " # Principal.toText(broadcaster) # " with " # debug_show(emitableEvents.size()) # " events");
       
-      let results = try {
+      ignore try {
         debug d(debug_channel.announce, "          PUBLISHER: Calling icrc72_publish on broadcaster...");
         let publishResults = await icrc72BroadcasterService.icrc72_publish(Buffer.toArray(emitableEvents));
         debug d(debug_channel.announce, "          PUBLISHER: Broadcaster publish completed successfully");
@@ -455,6 +464,9 @@ module {
         debug d(debug_channel.announce, "          PUBLISHER: Error publishing replay batch: " # Error.message(e));
         return [];
       };
+
+      // CC-05 fix: Update replay status AFTER broadcaster confirms receipt
+      ignore BTree.insert(state.replayStatus, Nat.compare, replayId, (lastEventId, isComplete));
 
       // Report status to orchestrator if replay is complete
       if (isComplete) {
@@ -741,7 +753,7 @@ module {
       if(Set.has<Principal>(broadcasters, Set.phash, broadcaster)){
       
           debug d(debug_channel.publish, "          PUBLISHER: Broadcaster removal: " # debug_show(broadcaster) # " Namespace: " # namespace);
-          Set.delete(broadcasters, Set.phash, broadcaster);
+          ignore Set.delete(broadcasters, Set.phash, broadcaster);
           if(Set.size(broadcasters) == 0){
             ignore BTree.delete(state.broadcasters, Text.compare, namespace);
           };
@@ -756,10 +768,19 @@ module {
     private func handleBroadcasterEvents<system>(notification: EventNotification) :  async* (){
       debug d(debug_channel.publish, "          PUBLISHER: Handling Broadcaster Events" # debug_show(notification));
 
-      if(notification.source != environment.icrc72OrchestratorCanister and (await* environment.icrc72Subscriber.validateBroadcaster(notification.source)) == false){
-        debug d(debug_channel.publish, "          PUBLISHER: handleBroadcasterEvents Not from Orchestrator or broadcaster");
-        //todo: log something
-        return ;
+      // CC-08 fix: wrap validateBroadcaster in try/catch to prevent trap propagation
+      if(notification.source != environment.icrc72OrchestratorCanister){
+        let isValid = try{
+          await* environment.icrc72Subscriber.validateBroadcaster(notification.source);
+        } catch(_e){
+          debug d(debug_channel.publish, "          PUBLISHER: handleBroadcasterEvents validateBroadcaster failed: " # Error.message(_e));
+          false;
+        };
+        if(isValid == false){
+          debug d(debug_channel.publish, "          PUBLISHER: handleBroadcasterEvents Not from Orchestrator or broadcaster");
+          //todo: log something
+          return ;
+        };
       };
 
       let #Map(data) = notification.data else {
@@ -841,37 +862,11 @@ module {
             
             debug d(debug_channel.publish, "          PUBLISHER: processing replay " # debug_show(replayId) # " for namespace " # replayNamespace # " with broadcaster " # debug_show(broadcasterPrincipal));
             
-            // Check if extended format with full details is provided  
-            let (filter : ?Text, skip : ?(Nat, Nat), range : (Nat, ?Nat)) = if(replayData.size() >= 7) {
-              debug d(debug_channel.publish, "          PUBLISHER: Using extended replay format with full details");
-              
-              let filterValue = switch(replayData[3]) {
-                case(#Option(null)) null;
-                case(#Text(f)) ?f;
-                case(_) null;
-              };
-              
-              let skipValue = switch(replayData[4]) {
-                case(#Option(null)) null;
-                case(#Nat(s)) ?(s, 0);
-                case(_) null;
-              };
-              
-              let rangeStart = switch(replayData[5]) {
-                case(#Nat(start)) start;
-                case(_) 0;
-              };
-              
-              let rangeEnd = switch(replayData[6]) {
-                case(#Option(null)) null;
-                case(#Nat(end)) ?end;
-                case(_) null;
-              };
-              
-              (filterValue, skipValue, (rangeStart, rangeEnd));
-            } else {
-              debug d(debug_channel.publish, "          PUBLISHER: Using basic replay format, getting details from orchestrator");
-              
+            // CC-15 fix: Always validate replay details against orchestrator
+            // regardless of notification format to prevent malicious injection
+            debug d(debug_channel.publish, "          PUBLISHER: Getting replay details from orchestrator");
+            
+            let (filter : ?Text, skip : ?(Nat, Nat), range : (Nat, ?Nat)) = do {
               // Get replay details from orchestrator
               let icrc77actor : ICRC77Service.Service = actor(Principal.toText(environment.icrc72OrchestratorCanister));
               
@@ -947,21 +942,50 @@ module {
       
     };
 
+    // CC-04 fix: track when processing started so we can detect stuck flag
+    private var _eventsProcessingStartedAt : Nat = 0;
+    private let EVENTS_PROCESSING_TIMEOUT : Nat = 300_000_000_000; // 5 minutes in nanoseconds
+
+    // CC-02 fix: track in-flight events so they can be recovered on stuck reset
+    private var _inFlightEvents : [EmitableEvent] = [];
+
     private func handleDrainPublisher<system>(id: TT.ActionId, _action: TT.Action) : async* Star.Star<TT.ActionId, TT.Error> {
 
       debug d(debug_channel.publish, "          PUBLISHER: Draining Publisher");
 
       if(state.eventsProcessing == true){
-        //delay to next round
-        debug d(debug_channel.publish, "          PUBLISHER: Already Running");
-        if(state.drainEventId == null){
-          ignore environment.tt.setActionASync<system>(natNow(), {actionType = CONST.publisher.actions.drain; params = to_candid(())}, FIVE_MINUTES);
+        // CC-04 fix: check if the flag is stale (stuck from a previous trap)
+        let now = natNow();
+        let stalledFor = if (now > _eventsProcessingStartedAt) {
+          Nat.sub(now, _eventsProcessingStartedAt)
+        } else {
+          0
         };
-        return #trappable(id);
+        if(stalledFor > EVENTS_PROCESSING_TIMEOUT){
+          debug d(debug_channel.publish, "          PUBLISHER: eventsProcessing was stuck for " # debug_show(stalledFor) # "ns, resetting");
+          // CC-02 fix: refile any in-flight events that were lost due to the stuck state
+          if(_inFlightEvents.size() > 0){
+            debug d(debug_channel.publish, "          PUBLISHER: refiling " # debug_show(_inFlightEvents.size()) # " in-flight events");
+            for(item in _inFlightEvents.vals()){
+              Vector.add(state.pendingEvents, item);
+            };
+            _inFlightEvents := [];
+          };
+          state.eventsProcessing := false;
+          // fall through to process
+        } else {
+          //delay to next round
+          debug d(debug_channel.publish, "          PUBLISHER: Already Running");
+          if(state.drainEventId == null){
+            ignore environment.tt.setActionASync<system>(natNow(), {actionType = CONST.publisher.actions.drain; params = to_candid(())}, FIVE_MINUTES);
+          };
+          return #trappable(id);
+        };
       };
 
       debug d(debug_channel.publish, "          PUBLISHER: setting drain event to null");
       state.eventsProcessing := true;
+      _eventsProcessingStartedAt := natNow();
       state.drainEventId := null;
 
       let groups = Map.new<Principal, Buffer.Buffer<EmitableEvent>>();
@@ -997,7 +1021,7 @@ module {
         if(idx < 100){
           Vector.put(procItems,idx, item);
         } else {
-          Vector.put(newItems, idx-100, item);
+          Vector.put(newItems, Nat.sub(idx, 100), item);
         };
       });
 
@@ -1019,12 +1043,15 @@ module {
           case(?val) val;
           case(null) {
             let newGroup = Buffer.Buffer<EmitableEvent>(1);
-            ignore Map.put(groups, Map.phash, item.broadcaster, newGroup);
+            Map.put(groups, Map.phash, item.broadcaster, newGroup);
             newGroup;
           };
         };
         group.add(item);
       };
+
+      // CC-02 fix: save all procItems as in-flight before the await boundary
+      _inFlightEvents := Vector.toArray(procItems);
 
       let accumulator = Buffer.Buffer<((Principal, Buffer.Buffer<EmitableEvent>) ,async [?ICRC72BroadcasterService.PublishResult])>(1);
       for(item in Map.entries(groups)){
@@ -1102,12 +1129,23 @@ module {
         accumulator.clear();
       };
 
+      // CC-02 fix: all events processed or refiled, clear in-flight tracking
+      _inFlightEvents := [];
       state.eventsProcessing := false;
 
       return #awaited(id);
     };
 
     private var _isInit = false;
+    private var _listenersRegistered = false;
+
+    public func registerListeners() : () {
+      if(_listenersRegistered) return;
+      _listenersRegistered := true;
+      debug d(debug_channel.startup, "          PUBLISHER: Registering execution listeners");
+      environment.tt.registerExecutionListenerAsync(?CONST.publisher.actions.drain, handleDrainPublisher);
+      environment.icrc72Subscriber.registerExecutionListenerAsync(?(CONST.publisher.sys # Principal.toText(canister)), handleBroadcasterEvents);
+    };
 
     public func initializeSubscriptions() : async() {
       if(_isInit == true) return;
@@ -1115,24 +1153,26 @@ module {
       debug d(debug_channel.startup, "          PUBLISHER: Initializing Publisher");
       //can only be called once 
       
-      
-      
-      environment.tt.registerExecutionListenerAsync(?CONST.publisher.actions.drain, handleDrainPublisher);
+      registerListeners();
 
-
-      environment.icrc72Subscriber.registerExecutionListenerAsync(?(CONST.publisher.sys # Principal.toText(canister)), handleBroadcasterEvents);
-
-      let subscriptionResult = await environment.icrc72Subscriber.registerSubscriptions([{
-        namespace = CONST.publisher.sys # Principal.toText(canister);
-        config = [];
-        memo = null
-      }]);
+      // CC-09 fix: wrap all awaits in try/catch so _isInit resets on failure
+      let subscriptionResult = try{
+        await environment.icrc72Subscriber.registerSubscriptions([{
+          namespace = CONST.publisher.sys # Principal.toText(canister);
+          config = [];
+          memo = null
+        }]);
+      } catch(e){
+        _isInit := false;
+        state.error := ?("Error registering publisher subscriptions: " # Error.message(e));
+        return;
+      };
 
       try{
         await environment.icrc72Subscriber.initializeSubscriptions();
       } catch(e){
         _isInit := false;
-        state.error := ?("Error initializing subscriber" # Error.message(e));
+        state.error := ?("Error initializing subscriber: " # Error.message(e));
         return;
       };
 

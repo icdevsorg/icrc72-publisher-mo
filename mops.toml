@@ -2,14 +2,15 @@ dev-dependencies = { }
 
 [dependencies]
 base = "0.13.6"
+core = "2.3.1"
 stableheapbtreemap = "1.5.0"
 star = "0.1.1"
 map = "9.0.1"
 vector = "0.3.1"
 ovs-fixed = "0.1.2"
 candy = "0.3.0"
-class-plus = "0.0.1"
-timer-tool = "0.1.1"
+class-plus = "0.2.1"
+timer-tool = "0.2.1"
 icrc72-subscriber-mo = "0.0.1"
 
 [package]
@@ -18,3 +19,6 @@ version = "0.0.2"
 description = "manage publications for icrc72"
 repository = "https://github.com/PanIndustrial-Org/icrc72-publisher-mo"
 keywords = [ "pubsub" ]
+
+[toolchain]
+moc = "1.5.1"
