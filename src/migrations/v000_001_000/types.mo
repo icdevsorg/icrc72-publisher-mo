@@ -8,9 +8,8 @@ import BTreeLib "mo:stableheapbtreemap/BTree";
 import SetLib "mo:core/Set";
 import Iter "mo:core/Iter";
 import Order "mo:core/Order";
-import CM "../../../../../../ICDevs/projects/icrc-fungible-group/champ_map/src/lib";
+import CM "mo:champ-map";
 import TT "mo:timer-tool";
-import ICRC72Subscriber "../../../../icrc72-subscriber.mo/src/";
 import BroadcasterService "../../broadcasterService";
 // please do not import any types from your project outside migrations folder here
 // it can lead to bugs when you change those types later, because migration types should not be changed
@@ -249,6 +248,47 @@ module {
     memo: ?Blob;
   };
 
+  public type SubscriptionRecord = {
+    namespace : Text;
+    config : ICRC16Map;
+    id : Nat;
+  };
+
+  public type ICRC75Item = {
+    principal : Principal;
+    namespace : Namespace;
+  };
+
+  public type SubscriberStats = {
+    icrc72OrchestratorCanister : Principal;
+    broadcasters : [(Nat, [Principal])];
+    subscriptions : [(Nat, SubscriptionRecord)];
+    validBroadcasters : { #list : [Principal]; #icrc75 : ICRC75Item };
+    confirmAccumulator : [(Principal, [(Nat, Nat)])];
+    confirmTimer : ?Nat;
+    lastEventId : [(Text, [(Nat, Nat)])];
+    backlogs : [(Nat, [(Nat, EventNotification)])];
+    replays : [(Nat, (Text, ?Principal, ?Text, ?(Nat, Nat), (Nat, ?Nat)))];
+    replayStatus : [(Nat, (Nat, Nat))];
+    readyForSubscription : Bool;
+    error : ?Text;
+    icrc85 : {
+      nextCycleActionId : ?Nat;
+      lastActionReported : ?Nat;
+      activeActions : Nat;
+    };
+    tt : TT.Stats;
+    log : [Text];
+  };
+
+  public type Subscriber = {
+    validateBroadcaster : (Principal) -> async* Bool;
+    registerExecutionListenerAsync : (?Text, <system>(EventNotification) -> async* ()) -> ();
+    registerSubscriptions : ([SubscriptionRegistration]) -> async [Any];
+    initializeSubscriptions : () -> async ();
+    stats : () -> SubscriberStats;
+  };
+
 
   public type SubscriberInterface = {
     handleNotification : ([Nat]) -> async ();
@@ -265,7 +305,7 @@ module {
   public type Environment = {
     var addRecord: ?(([(Text, Value)], ?[(Text,Value)]) -> Nat);
     var generateId: ?((Text, State) -> Nat);
-    icrc72Subscriber : ICRC72Subscriber.Subscriber;
+    icrc72Subscriber : Subscriber;
     var icrc72OrchestratorCanister : Principal;
     var onEventPublishError : ?(<system>(NewEvent, BroadcasterService.PublishError) -> Bool);
     var onEventPublished : ?(<system>(NewEvent, ?BroadcasterService.PublishResult) -> ());
@@ -293,7 +333,7 @@ module {
     error: ?Text;
     tt: TT.Stats;
     icrc72OrchestratorCanister: Principal;
-    icrc72Subscriber: ICRC72Subscriber.Stats;
+    icrc72Subscriber: SubscriberStats;
     orchestrator: Principal;
     log: [Text];
   };

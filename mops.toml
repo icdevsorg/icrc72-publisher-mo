@@ -1,4 +1,6 @@
-dev-dependencies = { }
+[dev-dependencies]
+bench = "2.0.1"
+base = "0.16.0"
 
 [dependencies]
 base = "0.16.0"
@@ -11,7 +13,7 @@ ovs-fixed = "0.2.2"
 candy = "0.3.1"
 class-plus = "0.2.1"
 timer-tool = "0.2.1"
-icrc72-subscriber-mo = "../icrc72-subscriber.mo"
+champ-map = "0.1.0"
 
 [package]
 name = "icrc72-publisher-mo"
@@ -21,4 +23,4 @@ repository = "https://github.com/PanIndustrial-Org/icrc72-publisher-mo"
 keywords = [ "pubsub" ]
 
 [toolchain]
-moc = "1.5.1"
+moc = "1.8.2"

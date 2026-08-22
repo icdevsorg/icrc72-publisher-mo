@@ -1,5 +1,5 @@
 import v0_1_0 "./v000_001_000/types";
-import Int "mo:base/Int";
+import Int "mo:core/Int";
 
 
 module {

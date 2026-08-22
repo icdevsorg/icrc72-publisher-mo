@@ -3,22 +3,22 @@ import MigrationLib "migrations";
 import BTree "mo:stableheapbtreemap/BTree";
 import OrchestrationService "./orchestratorService";
 
-import Array "mo:base/Array";
+import Array "mo:core/Array";
 import Buffer "mo:base/Buffer";
-import D "mo:base/Debug";
-import Error "mo:base/Error";
-import Int "mo:base/Int";
-import Iter "mo:base/Iter";
-import Nat "mo:base/Nat";
-import Principal "mo:base/Principal";
+import D "mo:core/Debug";
+import Error "mo:core/Error";
+import Int "mo:core/Int";
+import Iter "mo:core/Iter";
+import Nat "mo:core/Nat";
+import Principal "mo:core/Principal";
+import Runtime "mo:core/Runtime";
 import Star "mo:star/star";
-import Text "mo:base/Text";
-import Time "mo:base/Time";
-import Timer "mo:base/Timer";
+import Text "mo:core/Text";
+import Time "mo:core/Time";
+import Timer "mo:core/Timer";
 import TT "mo:timer-tool";
-import ICRC72Subscriber "../../icrc72-subscriber.mo/src/";
 import ICRC72BroadcasterService "./broadcasterService";
-import ICRC77Service "../../icrc72-orchestrator.mo/src/ICRC77Service";
+import ICRC77Service "./ICRC77Service";
 import ClassPlusLib "mo:class-plus";
 
 module {
@@ -167,7 +167,7 @@ module {
     let environment = switch(environment_passed){
       case(?val) val;
       case(null) {
-        D.trap("Environment is required");
+        Runtime.trap("Environment is required");
       };
     };
 
@@ -178,7 +178,7 @@ module {
             foundState;
           };
           case (_) {
-            D.trap("unexpected publisher migration state during initialization");
+            Runtime.trap("unexpected publisher migration state during initialization");
           };
         };
       };
@@ -188,7 +188,7 @@ module {
             foundState;
           };
           case (_) {
-            D.trap("unexpected publisher migration state during restore");
+            Runtime.trap("unexpected publisher migration state during restore");
           };
         };
       };
@@ -1090,7 +1090,7 @@ module {
                       true;
                     };
                   };
-                  if requeue  Vector.add(state.pendingEvents, thisAccumulator.0.1.get(idx));
+                  if requeue Vector.add(state.pendingEvents, thisAccumulator.0.1.get(idx));
                 };
                 case(null) {
                   debug d(debug_channel.publish, "          PUBLISHER: Error publishing event null: " # debug_show(thisAccumulator.0.0));
@@ -1176,7 +1176,7 @@ module {
         return;
       };
 
-      debug d(debug_channel.startup, "          PUBLISHER: Subscription Result: " # debug_show(subscriptionResult));
+      debug d(debug_channel.startup, "          PUBLISHER: Subscription results: " # Nat.toText(subscriptionResult.size()));
     };
 
 
@@ -1189,7 +1189,7 @@ module {
     readyForPublications: Bool;
     error: ?Text;
     tt: TT.Stats;
-    subscriber: ICRC72Subscriber.Stats;
+    subscriber: MigrationTypes.Current.SubscriberStats;
     orchestrator: Principal; */
     public func stats(): Stats {
       return {

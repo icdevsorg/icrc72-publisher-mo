@@ -1,7 +1,7 @@
 import MigrationTypes "../types";
-import Time "mo:base/Time";
+import Time "mo:core/Time";
 import v0_1_0 "types";
-import D "mo:base/Debug";
+import D "mo:core/Debug";
 
 module {
 

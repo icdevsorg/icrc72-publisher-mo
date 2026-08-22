@@ -1,4 +1,4 @@
-import D "mo:base/Debug";
+import D "mo:core/Debug";
 
 import MigrationTypes "./types";
 import v0_0_0 "./v000_000_000";
