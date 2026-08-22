@@ -19,7 +19,7 @@ champ-map = "0.1.0"
 name = "icrc72-publisher-mo"
 version = "0.0.2"
 description = "manage publications for icrc72"
-repository = "https://github.com/PanIndustrial-Org/icrc72-publisher-mo"
+repository = "https://github.com/icdevsorg/icrc72-publisher-mo"
 keywords = [ "pubsub" ]
 
 [toolchain]
